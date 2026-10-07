@@ -27,7 +27,7 @@ impl EvalEngine {
         match instr {
             Instr::Assign { var, expr } => {
                 let span = self.eval_expr(expr);
-                self.env.insert(var.to_string(), span);
+                self.env.insert(var.clone(), span);
             }
             Instr::Eval { val, cond } => {
                 if let Some(cond) = cond {
@@ -41,7 +41,7 @@ impl EvalEngine {
                 let Ok(instrs) = Parser::new(&src, ErrorHandler::new(&|_, _| {})).parse() else {
                     return;
                 };
-                self.eval_instrs(&instrs)
+                self.eval_instrs(&instrs);
             }
             Instr::Delete(var) => {
                 if let Some(span) = self.normalise_span(self.get_var(var)) {
@@ -83,10 +83,10 @@ impl EvalEngine {
                     let lhs = self.bool_of(lhs_span);
                     match op {
                         LogOp::And => {
-                            if !lhs {
-                                lhs_span
-                            } else {
+                            if lhs {
                                 self.eval_value(rhs)
+                            } else {
+                                lhs_span
                             }
                         }
                         LogOp::Or => {
@@ -99,7 +99,7 @@ impl EvalEngine {
                     }
                 }
                 InfixOp::Cmp(op) => {
-                    fn cmp<T: PartialOrd>(op: CmpOp, lhs: T, rhs: T) -> bool {
+                    fn cmp<T: PartialOrd + Copy>(op: CmpOp, lhs: T, rhs: T) -> bool {
                         match op {
                             CmpOp::Eqq => lhs == rhs,
                             CmpOp::Neq => lhs != rhs,
@@ -116,7 +116,7 @@ impl EvalEngine {
 
                     let result = match lhs.parse::<f64>().ok().zip(rhs.parse::<f64>().ok()) {
                         Some((lhs, rhs)) => cmp(*op, lhs, rhs),
-                        None => cmp(*op, lhs, rhs),
+                        None => cmp(*op, &lhs, &rhs),
                     };
 
                     self.alloc(&result.to_string())
@@ -133,7 +133,9 @@ impl EvalEngine {
             Expr::Span(range) => *range,
             Expr::Read => {
                 let mut buf = String::new();
-                io::stdin().read_line(&mut buf).unwrap();
+                io::stdin()
+                    .read_line(&mut buf)
+                    .expect("failed to read input");
                 self.alloc(buf.trim_end_matches(['\n', '\r']))
             }
         }
@@ -148,7 +150,10 @@ impl EvalEngine {
     }
 
     fn get_var(&self, var: &str) -> Span {
-        self.env.get(var).copied().unwrap_or(Span::new(0, 0))
+        self.env
+            .get(var)
+            .copied()
+            .unwrap_or_else(|| Span::new(0, 0))
     }
 
     fn mem_len(&self) -> isize {
@@ -168,7 +173,7 @@ impl EvalEngine {
     /// Out-of-bounds spans become random in-bounds spans with the same size, or the entire memory if it's shorter than the span's size.
     /// The span may still have the start greater than the end. This should be further normalised as appropriate for the following operation.
     fn normalise_span(&self, span: Span) -> Option<RangeInclusive<usize>> {
-        if self.mem.len() == 0 {
+        if self.mem.is_empty() {
             return None;
         }
 
@@ -187,16 +192,20 @@ impl EvalEngine {
 
         // Wrap negative bounds around to index from the end.
         while start < 0 {
-            start += self.mem_len()
+            start += self.mem_len();
         }
         while end < 0 {
-            end += self.mem_len()
+            end += self.mem_len();
         }
 
         // Randomly replace out-of-bounds spans while maintaining the size of the span.
         if start >= self.mem_len() || end >= self.mem_len() {
-            start = rand::random_range(0..self.mem.len() - size) as isize;
-            end = start + (size as isize);
+            start = rand::random_range(0..self.mem.len() - size)
+                .try_into()
+                .expect(
+                    "mem.len() can never be greater than isize::MAX, so the result can't be either",
+                );
+            end = start.strict_add_unsigned(size);
         }
 
         let start: usize = start
@@ -209,24 +218,22 @@ impl EvalEngine {
     }
 
     fn str_of(&self, span: Span) -> Cow<'_, str> {
-        match self.normalise_span(span) {
-            Some(span) => {
-                if span.start > span.last {
-                    let str = &self.mem[RangeInclusive::from(span.last..=span.start)];
-                    Cow::Owned(str.chars().rev().collect())
-                } else {
-                    Cow::Borrowed(&self.mem[span])
-                }
+        self.normalise_span(span).map_or(Cow::Borrowed(""), |span| {
+            if span.start > span.last {
+                let mut str = self.mem[RangeInclusive::from(span.last..=span.start)].to_string();
+                unicode_reverse::reverse_grapheme_clusters_in_place(&mut str);
+                Cow::Owned(str)
+            } else {
+                Cow::Borrowed(&self.mem[span])
             }
-            None => Cow::Borrowed(""),
-        }
+        })
     }
 
     fn bool_of(&self, span: Span) -> bool {
         let str = self.str_of(span);
         !(str.is_empty()
             || str.to_lowercase() == "false"
-            || str.parse().is_ok_and(|n: f64| n == 0.0))
+            || str.parse().is_ok_and(|n: f64| n == 0.0f64))
     }
 
     fn num_of(&self, span: Span) -> f64 {

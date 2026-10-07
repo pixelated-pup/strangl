@@ -151,9 +151,10 @@ impl<'src> Parser<'src> {
                 tok.span,
             ));
         }
-        let int = isize::from_str_radix(self.src_of(tok), 10)
-            .expect("ICE: lexer produced invalid int token");
-        Ok(int)
+        Ok(self
+            .src_of(tok)
+            .parse()
+            .expect("ICE: lexer produced invalid int token"))
     }
 
     fn value(&mut self) -> Result<Value> {
@@ -161,7 +162,7 @@ impl<'src> Parser<'src> {
         match tok.kind {
             TokKind::StringLit => {
                 let src = self.src_of(tok);
-                let lit = self.process_escapes(&src[1..src.len() - 1])?;
+                let lit = process_escapes(&src[1..src.len() - 1]);
                 Ok(Value::Literal(lit))
             }
             TokKind::Times => Ok(Value::All),
@@ -169,28 +170,28 @@ impl<'src> Parser<'src> {
             _ => Err(self.unexpected(tok, None)),
         }
     }
+}
 
-    fn process_escapes(&self, src: &str) -> Result<String> {
-        let mut chars = src.chars();
-        let mut out = String::new();
-        while let Some(c) = chars.next() {
-            let c = match c {
-                '\\' => match chars.next().expect("ICE: lexer produced standalone `\\`") {
-                    '\\' => '\\',
-                    '\'' => '\'',
-                    '"' => '"',
-                    '0' => '\0',
-                    'n' => '\n',
-                    'r' => '\r',
-                    't' => '\t',
-                    c => c,
-                },
+fn process_escapes(src: &str) -> String {
+    let mut chars = src.chars();
+    let mut out = String::new();
+    while let Some(c) = chars.next() {
+        let c = match c {
+            '\\' => match chars.next().expect("ICE: lexer produced standalone `\\`") {
+                '\\' => '\\',
+                '\'' => '\'',
+                '"' => '"',
+                '0' => '\0',
+                'n' => '\n',
+                'r' => '\r',
+                't' => '\t',
                 c => c,
-            };
-            out.push(c);
-        }
-        Ok(out)
+            },
+            c => c,
+        };
+        out.push(c);
     }
+    out
 }
 
 /// Helper functions.
@@ -267,7 +268,7 @@ impl<'src> Parser<'src> {
         self.handler.report(error, span)
     }
 
-    fn unexpected(&mut self, tok: Tok, msg: Option<&'static str>) -> HandledError {
+    fn unexpected(&self, tok: Tok, msg: Option<&'static str>) -> HandledError {
         self.err(ErrorKind::Unexpected(tok.kind, msg), tok.span)
     }
 }

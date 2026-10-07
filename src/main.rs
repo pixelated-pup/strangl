@@ -19,7 +19,13 @@ fn main() {
         println!("source path expected as first argument");
         return;
     };
-    let src = fs::read_to_string(&src_path).unwrap();
+    let src = match fs::read_to_string(&src_path) {
+        Ok(src) => src,
+        Err(err) => {
+            println!("error reading source file: {err}");
+            return;
+        }
+    };
 
     let handler_inner: HandlerCallback = &|report, span| print_diagnostic(report, span, &src);
     let handler = ErrorHandler::new(handler_inner);

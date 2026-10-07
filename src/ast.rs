@@ -59,7 +59,7 @@ pub struct Span {
 }
 
 impl Span {
-    pub fn new(start: isize, end: isize) -> Self {
+    pub const fn new(start: isize, end: isize) -> Self {
         Self { start, end }
     }
 }
