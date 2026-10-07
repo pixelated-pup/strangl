@@ -1,0 +1,43 @@
+[package]
+name = "string_lang"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+derive_more = { version = "2.1.1", features = ["display"] }
+logos = "0.16.1"
+rand = "0.10.3"
+yansi = "1.0.1"
+
+[lints.clippy]
+must_use_candidate = "allow"
+single_match_else = "allow"
+bool_to_int_with_if = "allow"
+match_bool = "allow"
+as_conversions = "deny"
+allow_attributes_without_reason = "deny"
+allow_attributes = "warn"
+absolute_paths = "deny"
+clone_on_ref_ptr = "deny"
+dbg_macro = "warn"
+default_numeric_fallback = "warn"
+doc_paragraphs_missing_punctuation = "warn"
+exit = "deny"
+if_then_some_else_none = "warn"
+inline_modules = "deny"
+map_with_unused_argument_over_ranges = "warn"
+needless_raw_strings = "warn"
+redundant_test_prefix = "warn"
+redundant_type_annotations = "warn"
+ref_patterns = "warn"
+self_named_module_files = "deny"
+semicolon_inside_block = "warn"
+single_char_lifetime_names = "warn"
+unused_trait_names = "deny"
+unwrap_used = "warn"
+use_debug = "warn"
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+
+[lints.rust]
+missing_docs = "warn"

@@ -1,0 +1,25 @@
+// Assigning to `nums` appends the literal value to the global memory string.
+nums = "0123456789"
+rand = [10, 10] // This span is out of bounds, so instead we'll read from a random span of length 1 every time we read this variable.
+dig1 = rand + "" // Freeze the random number by performing an identity operation with it, otherwise we'd get a different number every time.
+dig2 = rand + "" // Freeze a second digit from the random number.
+num = [10, 11] // Combine those last two characters into one 2-digit number.
+
+// We could print these strings directly, but that would allocate each string again every loop, so we cache them here.
+prompt = "Make a guess: " 
+low = "Too low"
+high = "Too high"
+
+// Preparing our blocks. Eval and conditional eval are the only control flow constructs.
+print_low = "print low"
+print_high = "print high"
+loop = "
+    print prompt
+    guess = read
+    eval print_high if guess > num
+    eval print_low if guess < num
+    eval loop if guess != num
+"
+
+eval loop
+print "Correct!"
