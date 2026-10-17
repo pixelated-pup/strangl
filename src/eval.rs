@@ -43,8 +43,9 @@ impl EvalEngine {
                 };
                 self.eval_instrs(&instrs);
             }
-            Instr::Delete(var) => {
-                if let Some(span) = self.normalise_span(self.get_var(var)) {
+            Instr::Delete(val) => {
+                let span = self.eval_value(val);
+                if let Some(span) = self.normalise_span(span) {
                     if span.start > span.last {
                         self.mem
                             .replace_range(RangeInclusive::from(span.last..=span.start), "");
@@ -130,7 +131,6 @@ impl EvalEngine {
                     self.alloc("true")
                 }
             }
-            Expr::Span(range) => *range,
             Expr::Read => {
                 let mut buf = String::new();
                 io::stdin()
@@ -146,6 +146,7 @@ impl EvalEngine {
             Value::Var(var) => self.get_var(var),
             Value::All => Span::new(0, self.mem_len() - 1),
             Value::Literal(lit) => self.alloc(lit),
+            Value::Span(span) => *span,
         }
     }
 
@@ -220,9 +221,12 @@ impl EvalEngine {
     fn str_of(&self, span: Span) -> Cow<'_, str> {
         self.normalise_span(span).map_or(Cow::Borrowed(""), |span| {
             if span.start > span.last {
-                let mut str = self.mem[RangeInclusive::from(span.last..=span.start)].to_string();
-                unicode_reverse::reverse_grapheme_clusters_in_place(&mut str);
-                Cow::Owned(str)
+                Cow::Owned(
+                    self.mem[RangeInclusive::from(span.last..=span.start)]
+                        .chars()
+                        .rev()
+                        .collect(),
+                )
             } else {
                 Cow::Borrowed(&self.mem[span])
             }
@@ -231,9 +235,7 @@ impl EvalEngine {
 
     fn bool_of(&self, span: Span) -> bool {
         let str = self.str_of(span);
-        !(str.is_empty()
-            || str.to_lowercase() == "false"
-            || str.parse().is_ok_and(|n: f64| n == 0.0f64))
+        !(str.is_empty() || str.to_lowercase() == "false")
     }
 
     fn num_of(&self, span: Span) -> f64 {

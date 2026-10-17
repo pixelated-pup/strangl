@@ -78,8 +78,8 @@ impl<'src> Parser<'src> {
                         tok.span,
                     ));
                 }
-                let var = self.src_of(tok).to_string();
-                Ok(Instr::Delete(var))
+                let val = self.value()?;
+                Ok(Instr::Delete(val))
             }
             TokKind::Print => self.value().map(Instr::Print),
             TokKind::Ident => {
@@ -95,9 +95,6 @@ impl<'src> Parser<'src> {
     fn expr(&mut self) -> Result<Expr> {
         let tok = self.peek()?;
         match tok.kind {
-            TokKind::LBracket => self
-                .span()
-                .map(|(start, end)| Expr::Span(Span::new(start, end))),
             TokKind::Bang => {
                 self.pos += 1;
                 self.value().map(Expr::Not)
@@ -106,7 +103,7 @@ impl<'src> Parser<'src> {
                 self.pos += 1;
                 Ok(Expr::Read)
             }
-            TokKind::StringLit | TokKind::Ident => {
+            TokKind::StringLit | TokKind::LBracket | TokKind::Times | TokKind::Ident => {
                 let lhs = self.value()?;
                 let op = match self.peek()?.kind {
                     TokKind::Plus => InfixOp::Arith(ArithOp::Add),
@@ -131,13 +128,25 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn span(&mut self) -> Result<(isize, isize)> {
-        self.consume(TokKind::LBracket)?;
-        let start = self.int()?;
-        self.consume(TokKind::Comma)?;
-        let end = self.int()?;
-        self.consume(TokKind::RBracket)?;
-        Ok((start, end))
+    fn value(&mut self) -> Result<Value> {
+        let tok = self.next()?;
+        match tok.kind {
+            TokKind::StringLit => {
+                let src = self.src_of(tok);
+                let lit = process_escapes(&src[1..src.len() - 1]);
+                Ok(Value::Literal(lit))
+            }
+            TokKind::LBracket => {
+                let start = self.int()?;
+                self.consume(TokKind::Comma)?;
+                let end = self.int()?;
+                self.consume(TokKind::RBracket)?;
+                Ok(Value::Span(Span::new(start, end)))
+            }
+            TokKind::Times => Ok(Value::All),
+            TokKind::Ident => Ok(Value::Var(self.src_of(tok).to_string())),
+            _ => Err(self.unexpected(tok, None)),
+        }
     }
 
     fn int(&mut self) -> Result<isize> {
@@ -155,20 +164,6 @@ impl<'src> Parser<'src> {
             .src_of(tok)
             .parse()
             .expect("ICE: lexer produced invalid int token"))
-    }
-
-    fn value(&mut self) -> Result<Value> {
-        let tok = self.next()?;
-        match tok.kind {
-            TokKind::StringLit => {
-                let src = self.src_of(tok);
-                let lit = process_escapes(&src[1..src.len() - 1]);
-                Ok(Value::Literal(lit))
-            }
-            TokKind::Times => Ok(Value::All),
-            TokKind::Ident => Ok(Value::Var(self.src_of(tok).to_string())),
-            _ => Err(self.unexpected(tok, None)),
-        }
     }
 }
 

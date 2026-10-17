@@ -1,7 +1,7 @@
 pub enum Instr {
     Assign { var: String, expr: Expr },
     Eval { val: Value, cond: Option<Expr> },
-    Delete(String),
+    Delete(Value),
     Print(Value),
 }
 
@@ -10,7 +10,6 @@ pub enum Expr {
     Value(Value),
     Infix { lhs: Value, op: InfixOp, rhs: Value },
     Not(Value),
-    Span(Span),
     Read,
 }
 
@@ -50,6 +49,7 @@ pub enum Value {
     Var(String),
     All,
     Literal(String),
+    Span(Span),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -5,7 +5,7 @@ use logos::Logos;
 
 /// Produces a vec of tokens extracted from the source.
 pub fn lex(src: &str) -> Vec<Result<Tok, Range<u32>>> {
-    TokKind::lexer(src)
+    TokKind::lexer(src.as_bytes())
         .spanned()
         .map(|(tok, span)| {
             let span = u32::try_from(span.start).expect("file too long")
@@ -25,6 +25,7 @@ pub struct Tok {
 }
 
 #[derive(Logos, PartialEq, Eq, Debug, Display, Clone, Copy)]
+#[logos(utf8 = false)]
 #[logos(skip(r"//.*", allow_greedy = true))]
 #[logos(skip(r"\p{Pattern_White_Space}+"))]
 #[logos(subpattern escape = r#"(\\\\)|(\\")|(\\0)|(\\t)|(\\n)|(\\r)"#)]
@@ -34,7 +35,7 @@ pub enum TokKind {
     #[regex("-?[0-9]+")]
     IntLit,
     /// string literal.
-    #[regex(r#"("([^"\\]|(?&escape))*")"#)]
+    #[regex(br#"("([^"\\]|(?&escape))*")"#)]
     StringLit,
 
     /* DELIMITERS */
@@ -135,7 +136,7 @@ pub enum TokKind {
 
     /* MISC */
     /// identifier.
-    #[regex(r"\p{XID_Start}\p{XID_Continue}*")]
+    #[regex(r"[a-zA-Z_]+")]
     Ident,
     /// end-of-file.
     Eof,

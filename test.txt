@@ -1,5 +1,0 @@
-x = "jasgj"
-y = [2, 0]
-print y
-delete y
-print y
